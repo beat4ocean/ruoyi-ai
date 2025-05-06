@@ -82,11 +82,11 @@ public class SseServiceImpl implements ISseService {
             if (!StpUtil.isLogin()) {
                 // 未登录用户限制对话次数
                 checkUnauthenticatedUserChatLimit(request);
-            }else {
+            } else {
                 LocalCache.CACHE.put("userId", chatCostService.getUserId());
                 chatRequest.setUserId(chatCostService.getUserId());
                 // 保存会话信息
-                if(chatRequest.getSessionId()==null){
+                if (chatRequest.getSessionId() == null) {
                     ChatSessionBo chatSessionBo = new ChatSessionBo();
                     chatSessionBo.setUserId(chatCostService.getUserId());
                     chatSessionBo.setSessionTitle(getFirst10Characters(chatRequest.getPrompt()));
@@ -98,10 +98,10 @@ public class SseServiceImpl implements ISseService {
                 chatCostService.deductToken(chatRequest);
             }
             // 根据模型分类调用不同的处理逻辑
-            switchModelAndHandle(chatRequest,sseEmitter);
+            switchModelAndHandle(chatRequest, sseEmitter);
         } catch (Exception e) {
-            log.error(e.getMessage(),e);
-            SSEUtil.sendErrorEvent(sseEmitter,e.getMessage());
+            log.error(e.getMessage(), e);
+            SSEUtil.sendErrorEvent(sseEmitter, e.getMessage());
         }
         return sseEmitter;
     }
@@ -117,6 +117,8 @@ public class SseServiceImpl implements ISseService {
         if (str.length() > 10) {
             // 如果长度大于10，截取前10个字符
             return str.substring(0, 10);
+        } else if (str.isEmpty()) {
+            return "";
         } else {
             // 如果长度不足10，返回整个字符串
             return str;
@@ -131,57 +133,57 @@ public class SseServiceImpl implements ISseService {
      */
     public void checkUnauthenticatedUserChatLimit(HttpServletRequest request) throws ServiceException {
 
-            String clientIp = IpUtil.getClientIp(request);
-            // 访客每天默认只能对话5次
-            int timeWindowInSeconds = 5;
-            String redisKey = "clientIp:" + clientIp;
-            int count = 0;
-            // 检查Redis中的对话次数
-            if (RedisUtils.getCacheObject(redisKey) == null) {
-                // 缓存有效时间1天
-                RedisUtils.setCacheObject(redisKey, count, Duration.ofSeconds(86400));
-            } else {
-                count = RedisUtils.getCacheObject(redisKey);
-                if (count >= timeWindowInSeconds) {
-                    throw new ServiceException("当日免费次数已用完");
-                }
-                count++;
-                RedisUtils.setCacheObject(redisKey, count);
-            }
-    }
-
-    /**
-     *  根据模型名称前缀调用不同的处理逻辑
-     */
-    private void switchModelAndHandle(ChatRequest chatRequest,SseEmitter emitter) {
-        // 调用ollama中部署的本地模型
-        if (ChatModeType.OLLAMA.getCode().equals(chatModelVo.getCategory())) {
-            ollamaService.chat(chatRequest,emitter);
+        String clientIp = IpUtil.getClientIp(request);
+        // 访客每天默认只能对话5次
+        int timeWindowInSeconds = 5;
+        String redisKey = "clientIp:" + clientIp;
+        int count = 0;
+        // 检查Redis中的对话次数
+        if (RedisUtils.getCacheObject(redisKey) == null) {
+            // 缓存有效时间1天
+            RedisUtils.setCacheObject(redisKey, count, Duration.ofSeconds(86400));
         } else {
-            openAIService.chat(chatRequest,emitter);
+            count = RedisUtils.getCacheObject(redisKey);
+            if (count >= timeWindowInSeconds) {
+                throw new ServiceException("当日免费次数已用完");
+            }
+            count++;
+            RedisUtils.setCacheObject(redisKey, count);
         }
     }
 
     /**
-     *  构建消息列表
+     * 根据模型名称前缀调用不同的处理逻辑
      */
-    private void buildChatMessageList(ChatRequest chatRequest){
-         chatModelVo = chatModelService.selectModelByName(chatRequest.getModel());
+    private void switchModelAndHandle(ChatRequest chatRequest, SseEmitter emitter) {
+        // 调用ollama中部署的本地模型
+        if (ChatModeType.OLLAMA.getCode().equals(chatModelVo.getCategory())) {
+            ollamaService.chat(chatRequest, emitter);
+        } else {
+            openAIService.chat(chatRequest, emitter);
+        }
+    }
+
+    /**
+     * 构建消息列表
+     */
+    private void buildChatMessageList(ChatRequest chatRequest) {
+        chatModelVo = chatModelService.selectModelByName(chatRequest.getModel());
         // 获取对话消息列表
         List<Message> messages = chatRequest.getMessages();
         String sysPrompt = chatModelVo.getSystemPrompt();
-        if(StringUtils.isEmpty(sysPrompt)){
-            sysPrompt ="你是一个由RuoYI-AI开发的人工智能助手，名字叫熊猫助手。你擅长中英文对话，能够理解并处理各种问题，提供安全、有帮助、准确的回答。" +
-                    "当前时间："+ DateUtils.getDate()+
+        if (StringUtils.isEmpty(sysPrompt)) {
+            sysPrompt = "你是一个由RuoYI-AI开发的人工智能助手，名字叫熊猫助手。你擅长中英文对话，能够理解并处理各种问题，提供安全、有帮助、准确的回答。" +
+                    "当前时间：" + DateUtils.getDate() +
                     "#注意：回复之前注意结合上下文和工具返回内容进行回复。";
         }
         // 设置系统默认提示词
         Message sysMessage = Message.builder().content(sysPrompt).role(Message.Role.SYSTEM).build();
-        messages.add(0,sysMessage);
+        messages.add(0, sysMessage);
 
         chatRequest.setSysPrompt(sysPrompt);
         // 查询向量库相关信息加入到上下文
-        if(StringUtils.isNotEmpty(chatRequest.getKid())){
+        if (StringUtils.isNotEmpty(chatRequest.getKid())) {
             List<Message> knMessages = new ArrayList<>();
             String content = messages.get(messages.size() - 1).getContent().toString();
             List<String> nearestList;
@@ -222,8 +224,8 @@ public class SseServiceImpl implements ISseService {
             InputStreamResource resource = new InputStreamResource(body.byteStream());
             // 创建并返回ResponseEntity
             return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .body(resource);
+                    .contentType(MediaType.parseMediaType("audio/mpeg"))
+                    .body(resource);
         } else {
             // 如果ResponseBody为空，返回404状态码
             return ResponseEntity.notFound().build();
